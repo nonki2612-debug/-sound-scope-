@@ -1,1 +1,1133 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>音の波形くらべ - 中学1年理科</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+            touch-action: manipulation;
+        }
+        /* スロット一覧のカスタムスクロールバー */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col select-none">
 
+    <!-- ヘッダー -->
+    <header class="bg-indigo-700 text-white px-4 py-3 shadow-md flex justify-between items-center flex-wrap gap-2">
+        <div class="flex items-center space-x-2">
+            <span class="bg-indigo-900 text-indigo-200 text-xs px-2.5 py-1 rounded-full font-bold">中1理科</span>
+            <h1 class="text-lg md:text-xl font-bold flex items-center gap-2">
+                <i class="fa-solid fa-wave-square text-amber-300"></i>
+                音の波形くらべスコープ
+            </h1>
+        </div>
+        <div class="flex items-center gap-2">
+            <button id="guideBtn" class="bg-indigo-800 hover:bg-indigo-600 text-xs md:text-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer">
+                <i class="fa-solid fa-book-open"></i>
+                <span>学習ポイント</span>
+            </button>
+            <button id="micHelpHeaderBtn" class="bg-indigo-800 hover:bg-indigo-600 text-xs md:text-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer">
+                <i class="fa-solid fa-circle-question"></i>
+                <span>マイク接続ガイド</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-3 md:p-4 flex flex-col gap-3">
+
+        <!-- おんさ・音階ジェネレーター（1行コンパクト設計） -->
+        <div class="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl px-3 py-2 shadow-sm flex flex-wrap lg:flex-nowrap items-center justify-between gap-2.5">
+            <!-- 鳴らすトグルボタン -->
+            <button id="toneToggleBtn" class="shrink-0 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm transition flex items-center gap-1.5 cursor-pointer">
+                <i class="fa-solid fa-play" id="toneToggleIcon"></i>
+                <span id="toneToggleText">おんさを鳴らす</span>
+            </button>
+
+            <!-- 音の高さ（ドレミボタン 1行） -->
+            <div class="flex items-center gap-1.5 flex-1 min-w-[260px]">
+                <span class="text-[11px] font-bold text-amber-900 shrink-0 whitespace-nowrap">
+                    <i class="fa-solid fa-arrows-left-right text-amber-600"></i> 高さ:
+                </span>
+                <div id="noteButtonsContainer" class="grid grid-cols-8 gap-1 flex-1">
+                    <!-- JSでド〜高いドの8ボタンを生成 -->
+                </div>
+            </div>
+
+            <!-- 音の大きさ（スライダー 1行） -->
+            <div class="flex items-center gap-2 shrink-0 bg-white/90 border border-amber-200 px-2.5 py-1 rounded-lg shadow-inner">
+                <span class="text-[11px] font-bold text-amber-900 shrink-0 whitespace-nowrap">
+                    <i class="fa-solid fa-arrows-up-down text-amber-600"></i> 大きさ:
+                </span>
+                <input type="range" id="toneVolumeRange" min="0.05" max="0.7" step="0.05" value="0.35" class="w-16 md:w-24 accent-amber-600 cursor-pointer">
+                <span id="toneVolumeLabel" class="text-amber-700 font-mono font-bold text-xs w-7 text-right">50%</span>
+            </div>
+        </div>
+
+        <!-- 波形表示モニターエリア -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 md:p-4 flex flex-col">
+            <!-- 画面上部ステータスバー -->
+            <div class="flex justify-between items-center mb-2 text-xs md:text-sm text-slate-500">
+                <div class="flex items-center gap-3">
+                    <span id="micStatusBadge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-700">
+                        <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                        マイク未接続
+                    </span>
+                    <span class="hidden sm:inline text-slate-400">|</span>
+                    <span class="hidden sm:inline"><i class="fa-solid fa-arrows-up-down text-indigo-500"></i> 上下: 振幅 (大きさ)</span>
+                    <span class="hidden sm:inline"><i class="fa-solid fa-arrows-left-right text-indigo-500"></i> 左右: 周期 (高さ)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="inline-flex items-center cursor-pointer text-xs">
+                        <input type="checkbox" id="gridToggle" class="sr-only peer" checked>
+                        <div class="relative w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                        <span class="ms-2 font-medium text-slate-600">方眼目盛り</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Canvas 表示領域 -->
+            <div class="relative w-full h-64 md:h-80 bg-slate-950 rounded-xl overflow-hidden shadow-inner flex items-center justify-center">
+                <canvas id="scopeCanvas" class="w-full h-full block"></canvas>
+
+                <!-- マイク開始オーバーレイ案内 -->
+                <div id="startOverlay" class="absolute inset-0 bg-slate-900/85 backdrop-blur-sm flex flex-col items-center justify-center p-4 text-center text-white">
+                    <div class="w-16 h-16 rounded-full bg-indigo-600/30 text-indigo-400 flex items-center justify-center text-3xl mb-3">
+                        <i class="fa-solid fa-microphone"></i>
+                    </div>
+                    <h2 class="text-xl font-bold mb-1">iPadの内蔵マイクを接続しよう</h2>
+                    <p class="text-slate-300 text-xs md:text-sm max-w-md mb-3">
+                        外付けマイクは不要です。「マイクを開始する」を押すとiPadの画面に許可ダイアログが出ますので、<strong>「許可」</strong>をタップしてください。
+                    </p>
+                    <div class="flex flex-wrap items-center justify-center gap-2 mb-2">
+                        <button id="startMicBtn" class="bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-indigo-600/30 flex items-center gap-2 text-base transition cursor-pointer">
+                            <i class="fa-solid fa-power-off"></i>
+                            マイクを開始する
+                        </button>
+                        <button id="micHelpOverlayBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm px-4 py-3 rounded-xl border border-slate-700 flex items-center gap-1.5 transition cursor-pointer">
+                            <i class="fa-solid fa-circle-question text-indigo-400"></i>
+                            接続方法・困ったとき
+                        </button>
+                    </div>
+                    <!-- マイクが使えない環境でも授業ができるデモ切り替え -->
+                    <div class="mt-2 pt-2 border-t border-slate-800/80 flex items-center gap-2">
+                        <span class="text-xs text-slate-400">マイクが使えない環境ですか？</span>
+                        <button id="startDemoModeBtn" class="text-xs text-amber-300 hover:text-amber-200 underline font-bold flex items-center gap-1 cursor-pointer">
+                            <i class="fa-solid fa-flask"></i> 模擬実験（デモ音源モード）で開始
+                        </button>
+                    </div>
+                    <span class="text-[11px] text-slate-400 mt-1">※iPadでは「https://」の暗号化URLで開く必要があります</span>
+                </div>
+            </div>
+
+            <!-- コントロールバー -->
+            <div class="mt-3 grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                <!-- キャプチャボタン（メインアクション） -->
+                <div class="md:col-span-5 flex gap-2">
+                    <button id="captureBtn" disabled class="flex-1 bg-rose-500 hover:bg-rose-600 active:bg-rose-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-xl shadow-md shadow-rose-500/20 flex items-center justify-center gap-2 text-base md:text-lg transition cursor-pointer">
+                        <i class="fa-solid fa-camera"></i>
+                        <span>波形を記録する (重ねる)</span>
+                    </button>
+                    <button id="clearAllBtn" title="すべての記録を消す" class="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 px-3 py-3 rounded-xl font-medium transition flex items-center justify-center cursor-pointer">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+
+                <!-- スライダー設定 -->
+                <div class="md:col-span-7 grid grid-cols-2 gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                    <div class="flex flex-col">
+                        <div class="flex justify-between text-xs font-medium text-slate-600 mb-1">
+                            <span><i class="fa-solid fa-magnifying-glass-plus text-indigo-500"></i> 横の拡大 (時間幅)</span>
+                            <span id="zoomVal" class="text-indigo-600 font-bold">1.0x</span>
+                        </div>
+                        <input type="range" id="zoomRange" min="0.5" max="3.0" step="0.1" value="1.0" class="w-full accent-indigo-600 cursor-pointer">
+                    </div>
+                    <div class="flex flex-col">
+                        <div class="flex justify-between text-xs font-medium text-slate-600 mb-1">
+                            <span><i class="fa-solid fa-up-down text-indigo-500"></i> 感度 (たての倍率)</span>
+                            <span id="gainVal" class="text-indigo-600 font-bold">1.5x</span>
+                        </div>
+                        <input type="range" id="gainRange" min="0.5" max="4.0" step="0.1" value="1.5" class="w-full accent-indigo-600 cursor-pointer">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 記録データスロット一覧（最大5回） -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-2.5 md:p-3">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <h2 class="text-sm md:text-base font-bold text-slate-800 flex items-center gap-1.5">
+                        <i class="fa-solid fa-layer-group text-indigo-600"></i>
+                        記録した波形 (最大5個)
+                    </h2>
+                    <span id="slotCountBadge" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                        0 / 5
+                    </span>
+                </div>
+                <span class="text-[11px] text-slate-400">チェックで重ね表示切替</span>
+            </div>
+
+            <!-- スロットカードグリッド（常に横1列: 5列） -->
+            <div id="slotsContainer" class="grid grid-cols-5 gap-1 md:gap-2">
+                <!-- JSで5つのスロットが描画されます -->
+            </div>
+        </div>
+    </main>
+
+    <!-- 学習ポイントモーダル -->
+    <div id="guideModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 class="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                    <i class="fa-solid fa-graduation-cap text-indigo-600"></i>
+                    理科「音の世界」観察のポイント
+                </h3>
+                <button id="closeGuideBtn" class="text-slate-400 hover:text-slate-600 text-xl p-1 cursor-pointer">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 text-xs md:text-sm text-slate-700">
+                <div class="bg-indigo-50 border border-indigo-200 p-3 rounded-xl">
+                    <h4 class="font-bold text-indigo-950 flex items-center gap-2 mb-1">
+                        <i class="fa-solid fa-arrows-up-down text-indigo-600"></i>
+                        1. 音の大きさ ＝「振幅」（波の上下の揺れ幅）
+                    </h4>
+                    <p class="text-slate-600 leading-relaxed">
+                        大きな音を出すと波の山が高く・谷が深くなり（振幅が大きい）、小さな音を出すと振幅は小さくなります。
+                    </p>
+                </div>
+
+                <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl">
+                    <h4 class="font-bold text-amber-950 flex items-center gap-2 mb-1">
+                        <i class="fa-solid fa-arrows-left-right text-amber-600"></i>
+                        2. 音の高さ ＝「振動数」（波の数の多さ・周期）
+                    </h4>
+                    <p class="text-slate-600 leading-relaxed">
+                        高い音を出すと1秒間の振動数（Hz）が増え、波がぎゅっと詰まって波の数が多くなります。低い音は波の数が少なくなります。
+                    </p>
+                </div>
+
+                <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
+                    <h4 class="font-bold text-emerald-950 flex items-center gap-2 mb-1">
+                        <i class="fa-solid fa-shapes text-emerald-600"></i>
+                        3. 音色（ねいろ）＝「波の形」
+                    </h4>
+                    <p class="text-slate-600 leading-relaxed">
+                        おんさはなめらかな正弦波ですが、人の声や楽器（リコーダーなど）はギザギザとした複雑な波形をしています。重ねて比較してみましょう！
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-5 text-center">
+                <button id="closeGuideBtn2" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2 rounded-xl text-sm transition cursor-pointer">
+                    閉じる
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- マイク接続ガイドモーダル -->
+    <div id="micHelpModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-microphone-lines text-indigo-600"></i>
+                    iPadマイクの接続・設定手順
+                </h3>
+                <button id="closeMicHelpBtn" class="text-slate-400 hover:text-slate-600 text-xl p-1 cursor-pointer">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 text-xs md:text-sm text-slate-700">
+                <div class="flex gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <span class="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">1</span>
+                    <div>
+                        <h4 class="font-bold text-slate-800 mb-0.5">外付けマイクは必要ありません</h4>
+                        <p class="text-slate-600 text-xs">
+                            iPad本体（上部またはカメラ付近）に高精度なマイクが内蔵されています。ケーブルなどの配線は不要です。
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <span class="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">2</span>
+                    <div>
+                        <h4 class="font-bold text-slate-800 mb-0.5">「マイクを開始する」をタップ ➔ 「許可」</h4>
+                        <p class="text-slate-600 text-xs">
+                            画面中央のボタンを押すと、iPadのSafariに<strong>「〜がマイクへのアクセスを求めています」</strong>と表示されます。必ず<strong>「許可」</strong>を選択してください。
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-rose-50 border border-rose-200 p-3 rounded-xl">
+                    <h4 class="font-bold text-rose-900 flex items-center gap-1.5 mb-1.5">
+                        <i class="fa-solid fa-ban text-rose-600"></i>
+                        iPadでマイクが動かない主なケース
+                    </h4>
+                    <ul class="text-xs text-rose-900 list-disc list-inside space-y-1">
+                        <li><strong>iPadの「ファイル」アプリから直接開いている場合</strong>：URLが <code class="bg-rose-100 px-1 rounded font-mono">file://</code> で始まっていると、iPadのセキュリティ制限によりマイクは起動できません。</li>
+                        <li><strong>URLが「http://」で始まっている場合</strong>：Webマイクは暗号化された <code class="bg-rose-100 px-1 rounded font-mono">https://</code> サイトでのみ動作します。</li>
+                    </ul>
+                </div>
+
+                <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl">
+                    <h4 class="font-bold text-amber-900 flex items-center gap-1.5 mb-1.5">
+                        <i class="fa-solid fa-triangle-exclamation text-amber-600"></i>
+                        「許可」が出ない／誤って「許可しない」を押した場合
+                    </h4>
+                    <ol class="text-xs text-amber-900 list-decimal list-inside space-y-1">
+                        <li>iPadの<strong>「設定」</strong>アプリを開く</li>
+                        <li>左メニューから<strong>「Safari」</strong>をタップ</li>
+                        <li>右側の「Webサイトの設定」にある<strong>「マイク」</strong>をタップ</li>
+                        <li>「確認」または<strong>「許可」</strong>にチェックを入れる</li>
+                        <li>Safariに戻り、画面上部の<strong>再読み込みボタン（丸い矢印）</strong>を押す</li>
+                    </ol>
+                </div>
+
+                <!-- エラー診断表示枠 -->
+                <div id="diagBox" class="bg-slate-900 text-slate-200 p-3 rounded-xl text-xs font-mono hidden">
+                    <div class="text-rose-400 font-bold mb-1">【現在の環境診断】</div>
+                    <div id="diagText" class="space-y-0.5"></div>
+                </div>
+            </div>
+
+            <div class="mt-5 text-center flex justify-center gap-2">
+                <button id="closeMicHelpBtn2" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2 rounded-xl text-sm transition cursor-pointer">
+                    閉じる
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- デモ音源選択パネル（デモモード起動時に表示） -->
+    <div id="demoControlPanel" class="fixed bottom-4 left-4 z-40 bg-white/95 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-amber-300 hidden max-w-sm">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-amber-800 flex items-center gap-1.5">
+                <i class="fa-solid fa-flask text-amber-600"></i> 模擬実験サウンド
+            </span>
+            <span class="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">デモ中</span>
+        </div>
+        <p class="text-[11px] text-slate-500 mb-2">音源を切り替えて「波形を記録する」を押してください</p>
+        <div class="grid grid-cols-2 gap-1.5 text-xs">
+            <button data-demo-sound="fork" class="demo-sound-btn bg-amber-100 text-amber-900 p-2 rounded-lg font-medium border border-amber-300 text-left cursor-pointer">
+                🔔 おんさ (440Hz)
+            </button>
+            <button data-demo-sound="high" class="demo-sound-btn bg-slate-50 hover:bg-slate-100 text-slate-800 p-2 rounded-lg font-medium border border-slate-200 text-left cursor-pointer">
+                📢 高い声 (880Hz)
+            </button>
+            <button data-demo-sound="low" class="demo-sound-btn bg-slate-50 hover:bg-slate-100 text-slate-800 p-2 rounded-lg font-medium border border-slate-200 text-left cursor-pointer">
+                📢 低い声 (220Hz)
+            </button>
+            <button data-demo-sound="recorder" class="demo-sound-btn bg-slate-50 hover:bg-slate-100 text-slate-800 p-2 rounded-lg font-medium border border-slate-200 text-left cursor-pointer">
+                🪈 リコーダー (倍音)
+            </button>
+        </div>
+    </div>
+
+    <!-- トースト通知 -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg text-sm flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none z-50">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toastMsg">通知メッセージ</span>
+    </div>
+
+    <script>
+        // スロット用設定（5色の視認しやすいカラーパレット）
+        const SLOT_COLORS = [
+            { id: 0, hex: '#3b82f6', name: '青 (データ1)', bgClass: 'bg-blue-500', textClass: 'text-blue-600' },
+            { id: 1, hex: '#ef4444', name: '赤 (データ2)', bgClass: 'bg-red-500', textClass: 'text-red-600' },
+            { id: 2, hex: '#10b981', name: '緑 (データ3)', bgClass: 'bg-emerald-500', textClass: 'text-emerald-600' },
+            { id: 3, hex: '#f59e0b', name: '橙 (データ4)', bgClass: 'bg-amber-500', textClass: 'text-amber-600' },
+            { id: 4, hex: '#8b5cf6', name: '紫 (データ5)', bgClass: 'bg-purple-500', textClass: 'text-purple-600' }
+        ];
+
+        // おんさ音階定義（生徒の理解しやすいドレミファソラシド）
+        const TONE_NOTES = [
+            { name: 'ド', freq: 261.63, sub: '262Hz' },
+            { name: 'レ', freq: 293.66, sub: '294Hz' },
+            { name: 'ミ', freq: 329.63, sub: '330Hz' },
+            { name: 'ファ', freq: 349.23, sub: '349Hz' },
+            { name: 'ソ', freq: 392.00, sub: '392Hz' },
+            { name: 'ラ', freq: 440.00, sub: '440Hz' },
+            { name: 'シ', freq: 493.88, sub: '494Hz' },
+            { name: '高いド', freq: 523.25, sub: '523Hz' }
+        ];
+
+        // アプリケーション状態
+        const state = {
+            audioContext: null,
+            analyser: null,
+            microphoneStream: null,
+            isMicRunning: false,
+            isDemoMode: false,
+            demoSoundType: 'fork',
+            demoTime: 0,
+            timeData: new Float32Array(2048),
+            slots: [null, null, null, null, null],
+            slotLabels: ['データ 1', 'データ 2', 'データ 3', 'データ 4', 'データ 5'],
+            slotVisible: [true, true, true, true, true],
+            zoom: 1.0,
+            gain: 1.5,
+            showGrid: true,
+            // おんさ・音階機能
+            isTonePlaying: false,
+            toneOscillator: null,
+            toneGainNode: null,
+            selectedNoteIndex: 0,
+            toneVolume: 0.35,
+            // 音声記録用リングバッファ（約1.5秒分）
+            ringBuffer: null,
+            ringBufferIndex: 0,
+            ringBufferSize: 0,
+            scriptProcessor: null,
+            silentGain: null,
+            currentPlayingSource: null,
+            playingSlotIndex: -1
+        };
+
+        // DOM参照
+        const canvas = document.getElementById('scopeCanvas');
+        const ctx = canvas.getContext('2d');
+        const startMicBtn = document.getElementById('startMicBtn');
+        const startDemoModeBtn = document.getElementById('startDemoModeBtn');
+        const demoControlPanel = document.getElementById('demoControlPanel');
+        const startOverlay = document.getElementById('startOverlay');
+        const micStatusBadge = document.getElementById('micStatusBadge');
+        const captureBtn = document.getElementById('captureBtn');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const zoomRange = document.getElementById('zoomRange');
+        const zoomVal = document.getElementById('zoomVal');
+        const gainRange = document.getElementById('gainRange');
+        const gainVal = document.getElementById('gainVal');
+        const gridToggle = document.getElementById('gridToggle');
+        const slotsContainer = document.getElementById('slotsContainer');
+        const slotCountBadge = document.getElementById('slotCountBadge');
+        const guideBtn = document.getElementById('guideBtn');
+        const guideModal = document.getElementById('guideModal');
+        const closeGuideBtn = document.getElementById('closeGuideBtn');
+        const closeGuideBtn2 = document.getElementById('closeGuideBtn2');
+        const toneToggleBtn = document.getElementById('toneToggleBtn');
+        const toneToggleText = document.getElementById('toneToggleText');
+        const toneToggleIcon = document.getElementById('toneToggleIcon');
+        const noteButtonsContainer = document.getElementById('noteButtonsContainer');
+        const toneVolumeRange = document.getElementById('toneVolumeRange');
+        const toneVolumeLabel = document.getElementById('toneVolumeLabel');
+        const micHelpModal = document.getElementById('micHelpModal');
+        const micHelpHeaderBtn = document.getElementById('micHelpHeaderBtn');
+        const micHelpOverlayBtn = document.getElementById('micHelpOverlayBtn');
+        const closeMicHelpBtn = document.getElementById('closeMicHelpBtn');
+        const closeMicHelpBtn2 = document.getElementById('closeMicHelpBtn2');
+        const diagBox = document.getElementById('diagBox');
+        const diagText = document.getElementById('diagText');
+
+        // 音階ボタンの動的描画
+        function renderToneButtons() {
+            noteButtonsContainer.innerHTML = '';
+            TONE_NOTES.forEach((note, idx) => {
+                const btn = document.createElement('button');
+                const isSelected = state.selectedNoteIndex === idx;
+                btn.className = `flex flex-col items-center justify-center py-1 px-0.5 rounded-lg text-center border transition-all cursor-pointer ${
+                    isSelected
+                        ? 'bg-amber-600 text-white font-bold border-amber-700 shadow ring-2 ring-amber-400'
+                        : 'bg-white hover:bg-amber-100 text-slate-700 border-amber-200'
+                }`;
+                btn.innerHTML = `
+                    <span class="text-[11px] md:text-xs ${isSelected ? 'font-black' : 'font-bold'} leading-tight truncate w-full">${note.name}</span>
+                    <span class="text-[8px] md:text-[9px] ${isSelected ? 'text-amber-100' : 'text-slate-400'} leading-none">${note.sub}</span>
+                `;
+                btn.addEventListener('click', () => {
+                    selectToneNote(idx);
+                });
+                noteButtonsContainer.appendChild(btn);
+            });
+        }
+
+        // 音階選択処理
+        function selectToneNote(idx) {
+            state.selectedNoteIndex = idx;
+            renderToneButtons();
+
+            const note = TONE_NOTES[idx];
+            if (state.isTonePlaying && state.toneOscillator && state.audioContext) {
+                state.toneOscillator.frequency.setValueAtTime(note.freq, state.audioContext.currentTime);
+                showToast(`おんさの音程を変更: ${note.name} (${note.sub})`, 'info');
+            }
+        }
+
+        // デモ用波形ジェネレータ
+        function generateDemoSample(t, type) {
+            if (type === 'fork') {
+                return 0.7 * Math.sin(2 * Math.PI * 440 * t);
+            } else if (type === 'high') {
+                return 0.6 * Math.sin(2 * Math.PI * 880 * t) + 0.2 * Math.sin(2 * Math.PI * 1760 * t);
+            } else if (type === 'low') {
+                return 0.7 * Math.sin(2 * Math.PI * 220 * t) + 0.3 * Math.sin(2 * Math.PI * 440 * t) + 0.15 * Math.sin(2 * Math.PI * 660 * t);
+            } else if (type === 'recorder') {
+                return 0.5 * Math.sin(2 * Math.PI * 523.25 * t) +
+                       0.3 * Math.sin(2 * Math.PI * 1046.5 * t) +
+                       0.2 * Math.sin(2 * Math.PI * 1569.75 * t);
+            }
+            return 0;
+        }
+
+        // 模擬実験（デモ音源モード）の開始
+        function startDemoMode() {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!state.audioContext) {
+                state.audioContext = new AudioContext();
+            }
+            if (state.audioContext.state === 'suspended') {
+                state.audioContext.resume();
+            }
+
+            state.isDemoMode = true;
+            state.isMicRunning = true;
+            state.timeData = new Float32Array(2048);
+            state.ringBufferSize = Math.floor(44100 * 1.5);
+            state.ringBuffer = new Float32Array(state.ringBufferSize);
+            state.ringBufferIndex = 0;
+
+            startOverlay.classList.add('hidden');
+            demoControlPanel.classList.remove('hidden');
+            captureBtn.disabled = false;
+
+            micStatusBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300';
+            micStatusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span> 模擬実験モード (デモ中)';
+
+            showToast('デモモードを開始しました。音源を選んで記録できます。', 'info');
+            requestAnimationFrame(drawScope);
+        }
+
+        // ゼロクロス検出（トリガー機能）
+        function findZeroCrossing(data, bufferLen) {
+            let startIndex = 0;
+            const searchLimit = Math.min(bufferLen / 2, 512);
+            for (let i = 0; i < searchLimit; i++) {
+                if (data[i] < 0 && data[i + 1] >= 0) {
+                    startIndex = i;
+                    break;
+                }
+            }
+            return startIndex;
+        }
+
+        // 波形キャプチャ機能
+        function captureWaveform() {
+            if (!state.isMicRunning && !state.isTonePlaying) {
+                showToast('マイクを開始するか、おんさを鳴らしてください', 'warn');
+                return;
+            }
+
+            if (!state.isDemoMode && state.analyser) {
+                state.analyser.getFloatTimeDomainData(state.timeData);
+            }
+
+            let targetSlot = state.slots.findIndex(s => s === null);
+            if (targetSlot === -1) {
+                targetSlot = 0;
+            }
+
+            const startIndex = findZeroCrossing(state.timeData, state.timeData.length);
+            const capturedLength = 1024;
+            const capturedArray = new Float32Array(capturedLength);
+
+            for (let i = 0; i < capturedLength; i++) {
+                const srcIdx = startIndex + i;
+                capturedArray[i] = srcIdx < state.timeData.length ? state.timeData[srcIdx] : 0;
+            }
+
+            let audioBuffer = null;
+            if (state.audioContext) {
+                const sampleRate = state.audioContext.sampleRate || 44100;
+                const recSamples = Math.min(state.ringBufferSize || 44100, Math.floor(sampleRate * 1.2));
+                audioBuffer = state.audioContext.createBuffer(1, recSamples, sampleRate);
+                const channelData = audioBuffer.getChannelData(0);
+
+                if (state.isTonePlaying) {
+                    const curNote = TONE_NOTES[state.selectedNoteIndex];
+                    const vol = state.toneVolume;
+                    for (let i = 0; i < recSamples; i++) {
+                        const t = i / sampleRate;
+                        channelData[i] = vol * Math.sin(2 * Math.PI * curNote.freq * t);
+                    }
+                } else if (state.isDemoMode) {
+                    for (let i = 0; i < recSamples; i++) {
+                        const t = i / sampleRate;
+                        channelData[i] = generateDemoSample(t, state.demoSoundType);
+                    }
+                } else if (state.ringBuffer) {
+                    const startPos = (state.ringBufferIndex - recSamples + state.ringBufferSize) % state.ringBufferSize;
+                    for (let i = 0; i < recSamples; i++) {
+                        const readIdx = (startPos + i) % state.ringBufferSize;
+                        channelData[i] = state.ringBuffer[readIdx];
+                    }
+                }
+            }
+
+            if (state.isTonePlaying) {
+                const note = TONE_NOTES[state.selectedNoteIndex];
+                const volPct = Math.round((state.toneVolume / 0.7) * 100);
+                state.slotLabels[targetSlot] = `おんさ:${note.name}(${volPct}%)`;
+            } else if (state.isDemoMode) {
+                const soundNames = {
+                    fork: 'おんさ (440Hz)',
+                    high: '高い声 (880Hz)',
+                    low: '低い声 (220Hz)',
+                    recorder: 'リコーダー'
+                };
+                state.slotLabels[targetSlot] = soundNames[state.demoSoundType] || `データ ${targetSlot + 1}`;
+            }
+
+            state.slots[targetSlot] = {
+                data: capturedArray,
+                audioBuffer: audioBuffer,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            };
+            state.slotVisible[targetSlot] = true;
+
+            renderSlotsUI();
+            showToast(`${SLOT_COLORS[targetSlot].name} に波形と音声を記録しました`, 'info');
+        }
+
+        // スロット音声の再生・停止
+        function playSlotAudio(index) {
+            const slot = state.slots[index];
+            if (!slot || !slot.audioBuffer || !state.audioContext) return;
+
+            if (state.currentPlayingSource) {
+                try {
+                    state.currentPlayingSource.stop();
+                } catch(e) {}
+                state.currentPlayingSource = null;
+            }
+
+            if (state.playingSlotIndex === index) {
+                state.playingSlotIndex = -1;
+                renderSlotsUI();
+                return;
+            }
+
+            if (state.audioContext.state === 'suspended') {
+                state.audioContext.resume();
+            }
+
+            const source = state.audioContext.createBufferSource();
+            source.buffer = slot.audioBuffer;
+
+            const playGain = state.audioContext.createGain();
+            playGain.gain.setValueAtTime(1.2, state.audioContext.currentTime);
+
+            source.connect(playGain);
+            playGain.connect(state.audioContext.destination);
+
+            state.currentPlayingSource = source;
+            state.playingSlotIndex = index;
+            renderSlotsUI();
+
+            source.onended = () => {
+                if (state.playingSlotIndex === index) {
+                    state.playingSlotIndex = -1;
+                    state.currentPlayingSource = null;
+                    renderSlotsUI();
+                }
+            };
+
+            source.start(0);
+        }
+
+        // スロットUI再描画
+        function renderSlotsUI() {
+            slotsContainer.innerHTML = '';
+            let filledCount = 0;
+
+            state.slots.forEach((slot, index) => {
+                const colorInfo = SLOT_COLORS[index];
+                const isFilled = slot !== null;
+                const isPlaying = state.playingSlotIndex === index;
+                if (isFilled) filledCount++;
+
+                const card = document.createElement('div');
+                card.className = `p-1.5 md:p-2 rounded-xl border transition-all ${
+                    isFilled ? 'bg-white border-slate-300 shadow-sm' : 'bg-slate-50 border-dashed border-slate-200'
+                }`;
+
+                if (isFilled) {
+                    card.innerHTML = `
+                        <div class="flex items-center justify-between gap-1 mb-1">
+                            <label class="flex items-center gap-1 cursor-pointer min-w-0 flex-1">
+                                <input type="checkbox" data-slot="${index}" class="slot-toggle rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 shrink-0 cursor-pointer" ${state.slotVisible[index] ? 'checked' : ''}>
+                                <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${colorInfo.hex}"></span>
+                                <input type="text" data-slot="${index}" value="${state.slotLabels[index]}" class="slot-label text-[11px] font-bold text-slate-700 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white px-0.5 py-0 rounded outline-none w-full truncate" title="${state.slotLabels[index]}">
+                            </label>
+                            <button data-slot="${index}" class="clear-slot-btn text-slate-400 hover:text-rose-500 p-0.5 text-[11px] shrink-0 transition cursor-pointer" title="消去">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between pt-1 border-t border-slate-100">
+                            <button data-slot="${index}" class="play-slot-btn flex items-center justify-center gap-1 text-[10px] font-bold px-1.5 py-1 rounded-md transition cursor-pointer w-full ${
+                                isPlaying 
+                                ? 'bg-rose-100 text-rose-700 animate-pulse' 
+                                : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700'
+                            }">
+                                <i class="fa-solid ${isPlaying ? 'fa-square' : 'fa-play'} text-[9px]"></i>
+                                <span>${isPlaying ? '停止' : '再生'}</span>
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    card.innerHTML = `
+                        <div class="flex items-center justify-center gap-1 text-slate-400 py-2">
+                            <span class="w-2 h-2 rounded-full bg-slate-200 shrink-0"></span>
+                            <span class="text-[11px] font-medium truncate">空き ${index + 1}</span>
+                        </div>
+                    `;
+                }
+
+                slotsContainer.appendChild(card);
+            });
+
+            slotCountBadge.textContent = `${filledCount} / 5`;
+            slotCountBadge.className = `text-xs font-semibold px-2 py-0.5 rounded-full ${
+                filledCount === 5 ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'
+            }`;
+
+            document.querySelectorAll('.slot-toggle').forEach(el => {
+                el.addEventListener('change', (e) => {
+                    const idx = parseInt(e.target.dataset.slot, 10);
+                    state.slotVisible[idx] = e.target.checked;
+                    renderSlotsUI();
+                });
+            });
+
+            document.querySelectorAll('.play-slot-btn').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    const btn = e.target.closest('button');
+                    const idx = parseInt(btn.dataset.slot, 10);
+                    playSlotAudio(idx);
+                });
+            });
+
+            document.querySelectorAll('.clear-slot-btn').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    const btn = e.target.closest('button');
+                    const idx = parseInt(btn.dataset.slot, 10);
+                    if (state.playingSlotIndex === idx && state.currentPlayingSource) {
+                        try { state.currentPlayingSource.stop(); } catch(e){}
+                        state.playingSlotIndex = -1;
+                    }
+                    state.slots[idx] = null;
+                    renderSlotsUI();
+                    showToast(`スロット ${idx + 1} を削除しました`, 'info');
+                });
+            });
+
+            document.querySelectorAll('.slot-label').forEach(el => {
+                el.addEventListener('change', (e) => {
+                    const idx = parseInt(e.target.dataset.slot, 10);
+                    state.slotLabels[idx] = e.target.value || `データ ${idx + 1}`;
+                });
+            });
+        }
+
+        // グリッド（方眼線）の描画
+        function drawGrid(w, h) {
+            ctx.save();
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1;
+
+            const vDivisions = 10;
+            for (let i = 0; i <= vDivisions; i++) {
+                const x = (w / vDivisions) * i;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+                ctx.stroke();
+            }
+
+            const hDivisions = 8;
+            for (let i = 0; i <= hDivisions; i++) {
+                const y = (h / hDivisions) * i;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+                ctx.stroke();
+            }
+
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(0, h / 2);
+            ctx.lineTo(w, h / 2);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 波形描画メインループ
+        function drawScope() {
+            if (!state.isMicRunning) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const w = rect.width;
+            const h = rect.height;
+
+            ctx.fillStyle = '#090d16';
+            ctx.fillRect(0, 0, w, h);
+
+            if (state.showGrid) {
+                drawGrid(w, h);
+            }
+
+            if (state.isDemoMode) {
+                const sampleRate = 44100;
+                state.demoTime = (state.demoTime || 0) + (1024 / sampleRate);
+                for (let i = 0; i < state.timeData.length; i++) {
+                    const t = state.demoTime + (i / sampleRate);
+                    const noise = (Math.random() - 0.5) * 0.03;
+                    state.timeData[i] = generateDemoSample(t, state.demoSoundType) + noise;
+                }
+            } else if (state.analyser) {
+                state.analyser.getFloatTimeDomainData(state.timeData);
+            }
+
+            const liveStart = findZeroCrossing(state.timeData, state.timeData.length);
+            const displaySamples = Math.floor(600 / state.zoom);
+            const step = w / displaySamples;
+
+            // 1. リアルタイム波形の描画（半透明）
+            ctx.save();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = state.isDemoMode ? 'rgba(251, 191, 36, 0.7)' : 'rgba(255, 255, 255, 0.4)';
+            ctx.beginPath();
+
+            for (let i = 0; i < displaySamples; i++) {
+                const dataIndex = liveStart + i;
+                const sample = dataIndex < state.timeData.length ? state.timeData[dataIndex] : 0;
+                const y = (h / 2) - (sample * (h / 2) * state.gain);
+                const x = i * step;
+
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            ctx.restore();
+
+            // 2. 記録されたスロット波形の重ね合わせ描画
+            state.slots.forEach((slot, idx) => {
+                if (!slot || !state.slotVisible[idx]) return;
+
+                ctx.save();
+                ctx.lineWidth = 2.5;
+                ctx.strokeStyle = SLOT_COLORS[idx].hex;
+                ctx.beginPath();
+
+                for (let i = 0; i < displaySamples; i++) {
+                    const sample = i < slot.data.length ? slot.data[i] : 0;
+                    const y = (h / 2) - (sample * (h / 2) * state.gain);
+                    const x = i * step;
+
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+                ctx.restore();
+            });
+
+            requestAnimationFrame(drawScope);
+        }
+
+        // おんさ（ドレミ音階・音量連動）の再生・停止
+        function toggleReferenceTone() {
+            if (!state.audioContext) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                state.audioContext = new AudioContext();
+            }
+
+            if (state.audioContext.state === 'suspended') {
+                state.audioContext.resume();
+            }
+
+            if (!state.analyser) {
+                state.analyser = state.audioContext.createAnalyser();
+                state.analyser.fftSize = 2048;
+                state.timeData = new Float32Array(state.analyser.fftSize);
+            }
+
+            if (state.isTonePlaying) {
+                if (state.toneOscillator) {
+                    try {
+                        state.toneOscillator.stop();
+                        state.toneOscillator.disconnect();
+                    } catch(e) {}
+                    state.toneOscillator = null;
+                }
+                state.isTonePlaying = false;
+                toneToggleBtn.className = 'bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white font-bold text-xs md:text-sm px-4 py-2 rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer';
+                toneToggleIcon.className = 'fa-solid fa-play';
+                toneToggleText.textContent = 'おんさを鳴らす';
+                showToast('おんさを止めました', 'info');
+            } else {
+                const note = TONE_NOTES[state.selectedNoteIndex];
+                const osc = state.audioContext.createOscillator();
+                const gain = state.audioContext.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(note.freq, state.audioContext.currentTime);
+                gain.gain.setValueAtTime(state.toneVolume, state.audioContext.currentTime);
+
+                osc.connect(gain);
+                gain.connect(state.audioContext.destination);
+                gain.connect(state.analyser);
+
+                osc.start();
+                state.toneOscillator = osc;
+                state.toneGainNode = gain;
+                state.isTonePlaying = true;
+
+                if (!state.isMicRunning) {
+                    state.isMicRunning = true;
+                    startOverlay.classList.add('hidden');
+                    captureBtn.disabled = false;
+                    micStatusBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300';
+                    micStatusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> おんさ出力中';
+                    requestAnimationFrame(drawScope);
+                }
+
+                toneToggleBtn.className = 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold text-xs md:text-sm px-4 py-2 rounded-xl shadow-lg ring-2 ring-rose-400 transition flex items-center gap-1.5 cursor-pointer animate-pulse';
+                toneToggleIcon.className = 'fa-solid fa-square';
+                toneToggleText.textContent = 'おんさを止める';
+                showToast(`おんさ【${note.name} (${note.sub})】を鳴らしました`, 'success');
+            }
+        }
+
+        // マイク接続初期化
+        async function initMicrophone() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!state.audioContext) {
+                    state.audioContext = new AudioContext();
+                }
+                if (state.audioContext.state === 'suspended') {
+                    await state.audioContext.resume();
+                }
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: false,
+                        autoGainControl: false,
+                        noiseSuppression: false
+                    }
+                });
+
+                state.microphoneStream = stream;
+                const source = state.audioContext.createMediaStreamSource(stream);
+
+                state.analyser = state.audioContext.createAnalyser();
+                state.analyser.fftSize = 2048;
+                state.timeData = new Float32Array(state.analyser.fftSize);
+
+                source.connect(state.analyser);
+
+                const sampleRate = state.audioContext.sampleRate || 44100;
+                state.ringBufferSize = Math.floor(sampleRate * 1.5);
+                state.ringBuffer = new Float32Array(state.ringBufferSize);
+                state.ringBufferIndex = 0;
+
+                state.scriptProcessor = state.audioContext.createScriptProcessor(2048, 1, 1);
+                state.scriptProcessor.onaudioprocess = (e) => {
+                    const input = e.inputBuffer.getChannelData(0);
+                    for (let i = 0; i < input.length; i++) {
+                        state.ringBuffer[state.ringBufferIndex] = input[i];
+                        state.ringBufferIndex = (state.ringBufferIndex + 1) % state.ringBufferSize;
+                    }
+                };
+
+                state.silentGain = state.audioContext.createGain();
+                state.silentGain.gain.setValueAtTime(0, state.audioContext.currentTime);
+
+                source.connect(state.scriptProcessor);
+                state.scriptProcessor.connect(state.silentGain);
+                state.silentGain.connect(state.audioContext.destination);
+
+                state.isMicRunning = true;
+                state.isDemoMode = false;
+                startOverlay.classList.add('hidden');
+                captureBtn.disabled = false;
+
+                micStatusBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700';
+                micStatusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> マイク接続中';
+
+                showToast('マイクが正常に接続されました', 'success');
+                requestAnimationFrame(drawScope);
+            } catch (err) {
+                console.error('マイクアクセスエラー:', err);
+                diagBox.classList.remove('hidden');
+                micHelpModal.classList.remove('hidden');
+                updateDiagnostics(err);
+                showToast('マイクへのアクセスに失敗しました', 'warn');
+            }
+        }
+
+        // 環境診断情報更新
+        function updateDiagnostics(err = null) {
+            let html = '';
+            const isHttps = location.protocol === 'https:';
+            const isLocalFile = location.protocol === 'file:';
+            const hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+            const inIframe = window.self !== window.top;
+
+            html += `<div>・ プロトコル: <span class="${isHttps ? 'text-emerald-400' : 'text-rose-400'}">${location.protocol}</span></div>`;
+            if (isLocalFile) {
+                html += `<div class="text-rose-300">※ file:// から直接開くとマイクは動きません。</div>`;
+            }
+            html += `<div>・ MediaDevices API: <span class="${hasMediaDevices ? 'text-emerald-400' : 'text-rose-400'}">${hasMediaDevices ? '利用可能' : '利用不可'}</span></div>`;
+            html += `<div>・ 埋め込み(iframe): <span class="${!inIframe ? 'text-emerald-400' : 'text-amber-400'}">${inIframe ? 'はい (マイク制限の可能性あり)' : 'いいえ (直接アクセス)'}</span></div>`;
+
+            if (err) {
+                html += `<div class="text-rose-400 mt-1">・ エラー詳細: ${err.name || ''} - ${err.message || ''}</div>`;
+            }
+            diagText.innerHTML = html;
+        }
+
+        // トースト通知
+        let toastTimeout = null;
+        function showToast(msg, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.textContent = msg;
+            if (type === 'success') {
+                toastIcon.className = 'fa-solid fa-circle-check text-emerald-400';
+            } else if (type === 'warn') {
+                toastIcon.className = 'fa-solid fa-triangle-exclamation text-amber-400';
+            } else {
+                toastIcon.className = 'fa-solid fa-circle-info text-cyan-400';
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 2500);
+        }
+
+        // Canvasリサイズ
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // 音量スライダーのイベント登録
+        toneVolumeRange.addEventListener('input', (e) => {
+            const rawVal = parseFloat(e.target.value);
+            state.toneVolume = rawVal;
+            const pct = Math.round((rawVal / 0.7) * 100);
+            toneVolumeLabel.textContent = `${pct}%`;
+
+            if (state.toneGainNode && state.audioContext) {
+                state.toneGainNode.gain.setValueAtTime(rawVal, state.audioContext.currentTime);
+            }
+        });
+
+        // 各種イベントリスナー登録
+        toneToggleBtn.addEventListener('click', toggleReferenceTone);
+        startMicBtn.addEventListener('click', initMicrophone);
+        startDemoModeBtn.addEventListener('click', startDemoMode);
+        captureBtn.addEventListener('click', captureWaveform);
+
+        document.querySelectorAll('.demo-sound-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const targetBtn = e.target.closest('button');
+                const type = targetBtn.dataset.demoSound;
+                state.demoSoundType = type;
+
+                document.querySelectorAll('.demo-sound-btn').forEach(b => {
+                    b.classList.remove('bg-amber-100', 'border-amber-400');
+                    b.classList.add('bg-slate-50', 'border-slate-200');
+                });
+                targetBtn.classList.remove('bg-slate-50', 'border-slate-200');
+                targetBtn.classList.add('bg-amber-100', 'border-amber-400');
+
+                showToast(`音源を切り替えました: ${targetBtn.textContent.trim()}`, 'info');
+            });
+        });
+
+        clearAllBtn.addEventListener('click', () => {
+            if (state.currentPlayingSource) {
+                try { state.currentPlayingSource.stop(); } catch(e){}
+                state.playingSlotIndex = -1;
+            }
+            state.slots = [null, null, null, null, null];
+            renderSlotsUI();
+            showToast('すべての記録波形を消去しました', 'info');
+        });
+
+        zoomRange.addEventListener('input', (e) => {
+            state.zoom = parseFloat(e.target.value);
+            zoomVal.textContent = state.zoom.toFixed(1) + 'x';
+        });
+
+        gainRange.addEventListener('input', (e) => {
+            state.gain = parseFloat(e.target.value);
+            gainVal.textContent = state.gain.toFixed(1) + 'x';
+        });
+
+        gridToggle.addEventListener('change', (e) => {
+            state.showGrid = e.target.checked;
+        });
+
+        guideBtn.addEventListener('click', () => guideModal.classList.remove('hidden'));
+        closeGuideBtn?.addEventListener('click', () => guideModal.classList.add('hidden'));
+        closeGuideBtn2?.addEventListener('click', () => guideModal.classList.add('hidden'));
+
+        micHelpHeaderBtn.addEventListener('click', () => micHelpModal.classList.remove('hidden'));
+        micHelpOverlayBtn.addEventListener('click', () => micHelpModal.classList.remove('hidden'));
+        closeMicHelpBtn?.addEventListener('click', () => micHelpModal.classList.add('hidden'));
+        closeMicHelpBtn2?.addEventListener('click', () => micHelpModal.classList.add('hidden'));
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !e.repeat && (state.isMicRunning || state.isTonePlaying)) {
+                if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+                e.preventDefault();
+                captureWaveform();
+            }
+        });
+
+        // 初期ロード時実行
+        window.addEventListener('load', () => {
+            resizeCanvas();
+            renderToneButtons();
+            renderSlotsUI();
+            updateDiagnostics();
+            ctx.fillStyle = '#090d16';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawGrid(canvas.width, canvas.height);
+        });
+    </script>
+</body>
+</html>
